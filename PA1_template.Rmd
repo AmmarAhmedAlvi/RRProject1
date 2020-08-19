@@ -1,0 +1,209 @@
+---
+title: "Reproducible Research Project-1"
+author: "Ammar Ahmed Alvi"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading required libraries
+
+```{r libraries}
+
+library(reshape2)
+library(ggplot2)
+library(plyr)
+
+```
+
+
+Loading and preparing the data
+
+```{r Preparing}
+data <- read.csv("activity.csv", header = TRUE)
+
+data$date <- as.Date(data$date)
+
+
+actMeltDate <- melt(data, id.vars="date", measure.vars="steps", na.rm=FALSE)
+activity <- dcast(actMeltDate, date ~ variable, sum)
+
+```
+
+### Question 1: Calculating and plotting the mean and median of the total number of steps per day
+
+You can also embed plots, for example:
+
+```{r Q1a}
+
+ggplot(activity, aes(x = date , y = steps)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_hline( yintercept = mean(activity$steps, na.rm = TRUE) , color = "Red", size = 1) +
+  ggtitle("Daily Steps") +
+  theme(plot.title = element_text(size = 18, hjust = 0.5))
+  
+
+```
+
+Mean and Median
+
+```{r Q1b}
+
+paste("Mean steps per day = ", mean(activity$steps, na.rm = TRUE))  
+paste("Median steps per day = ", median(activity$steps, na.rm = TRUE))
+
+```
+
+
+### Question 2: Calculating and plotting the average daily activity pattern by interval
+
+
+
+```{r Q2a}
+
+actMeltInt <- melt(data, id.vars="interval", measure.vars="steps", na.rm=TRUE)
+actCastInt <- dcast(actMeltInt, interval ~ variable, mean)
+
+ggplot(actCastInt, aes(x = interval , y = steps)) +
+  geom_line(size= 1, color = "DarkRed") +
+  geom_hline(yintercept = mean(actCastInt$steps), color = "Blue", size = 1) +
+  ggtitle("Steps Taken at Each Interval") +
+  theme(plot.title = element_text(size = 18, hjust = 0.5))
+
+
+```
+
+
+
+
+```{r Q2b}
+
+paste("Interval with max value =", actCastInt$interval[which(actCastInt$steps == max(actCastInt$steps))])
+paste("Maximum interval mean steps =", max(actCastInt$steps))
+
+```
+
+
+### Question 3: Imputing missing values to replace NAs in data set and compare results
+
+```{r Q3a}
+
+#Calculating the total number of missing values in the original data
+
+sum(is.na(data$steps))
+
+```
+
+Since there are many missing values, I will replace them with the mean of their respective interval
+
+
+```{r Q3b}
+
+# Data frame with mean steps per interval - just renaming to be more descriptive
+stepsInt <- actCastInt
+
+# Create data frame that we will remove NAs from
+CleanData <- data
+
+# Merge activity data set with stepsPerInt data set
+actMerge = merge(CleanData, stepsInt, by="interval", suffixes=c(".act", ".spi"))
+
+# Get list of indexes where steps value = NA
+naIndex = which(is.na(CleanData$steps))
+
+# Replace NA values with value from steps.spi
+CleanData[naIndex,"steps"] = actMerge[naIndex,"steps.spi"]
+
+```
+
+
+
+```{r Q3c}
+
+actMeltDateNoNA <- melt(CleanData, id.vars="date", measure.vars="steps", na.rm=FALSE)
+# Cast data frame to see steps per day
+actCastDateNoNA <- dcast(actMeltDateNoNA, date ~ variable, sum)
+
+
+ggplot(actCastDateNoNA, aes(x = date , y = steps)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_hline( yintercept = mean(actCastDateNoNA$steps, na.rm = TRUE) , color = "Red", size = 1) +
+  ggtitle("Daily Steps (Imputted NAs)") +
+  theme(plot.title = element_text(size = 18, hjust = 0.5))
+
+
+```
+
+
+Mean and Median
+
+```{r Q3d}
+
+paste("Mean steps per day = ", mean(actCastDateNoNA$steps, na.rm = TRUE))  
+paste("Median steps per day = ", median(actCastDateNoNA$steps, na.rm = TRUE))
+
+```
+
+
+
+### Question 4: Check if differences exist in activity patterns between weekdays and weekends
+
+
+Creating a factor variable to state whether a day is a weekend or not
+
+```{r Q4a}
+
+for (i in 1:nrow(CleanData)) {
+    if (weekdays(CleanData$date[i]) == "Saturday" | weekdays(CleanData$date[i]) == "Sunday") {
+        CleanData$dayOfWeek[i] = "weekend"
+    } else {
+        CleanData$dayOfWeek[i] = "weekday"
+    }
+}
+
+
+```
+
+
+Subsetting data to plot the graph
+
+```{r Q4b}
+
+# To create a plot, we must first subset the data
+actWeekday <- subset(CleanData, dayOfWeek=="weekday")
+actWeekend <- subset(CleanData, dayOfWeek=="weekend")
+
+# Next, we need to process the data for our needs
+actMeltWeekday <- melt(actWeekday, id.vars="interval", measure.vars="steps")
+actMeltWeekend <- melt(actWeekend, id.vars="interval", measure.vars="steps")
+actCastWeekday <- dcast(actMeltWeekday, interval ~ variable, mean)
+actCastWeekend <- dcast(actMeltWeekend, interval ~ variable, mean)
+
+
+```
+
+
+Plotting graphs
+
+```{r Q4c}
+
+plot1 <- qplot(interval, steps, geom="line", data=actCastWeekday, type="bar", main="Steps by Interval - Weekday", xlab="Interval ID", ylab="Number of Steps")
+plot2 <- qplot(interval, steps, geom="line", data=actCastWeekend, type="bar", main="Steps by Interval - Weekend", xlab="Interval ID", ylab="Number of Steps")
+
+plot1
+plot2
+
+```
+
+
+
+
+
+
+
